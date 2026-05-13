@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Fuel System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: yellowgreen; }
+
+        .navbar {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(0,0,0,0.88); padding: 14px 20px;
+            color: white; font-size: 22px; font-weight: bold;
+        }
+        .navbar span.addr { font-size: 12px; color: #aaa; max-width: 55%; text-align: right; }
+
+        /* ── GPS loading overlay ── */
+        #gps-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.82);
+            z-index: 99999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white; text-align: center;
+        }
+        .pulse-ring {
+            width: 80px; height: 80px; border-radius: 50%;
+            border: 4px solid #4CAF50;
+            animation: pulse-ring 1.2s ease-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes pulse-ring {
+            0%   { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .gps-icon { font-size: 40px; margin-bottom: 10px; }
+        #overlay-status { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+        #overlay-sub    { font-size: 13px; color: #aaa; margin-bottom: 20px; }
+        #overlay-err    { display:none; background: #c62828; border-radius: 8px;
+                          padding: 12px 20px; font-size: 14px; margin-top: 10px; max-width: 320px; }
+        #btn-manual     { display:none; padding: 10px 20px; background: #1565C0;
+                          color: white; border: none; border-radius: 6px;
+                          cursor: pointer; font-size: 15px; margin-top: 10px; }
+
+        .container { padding: 14px; text-align: center; }
+
+        /* ── Status bar ── */
+        #status-bar {
+            display: flex; align-items: center; gap: 8px; justify-content: center;
+            background: rgba(0,0,0,0.78); color: white; border-radius: 8px;
+            padding: 7px 14px; font-size: 13px; margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; background: gray; }
+        .dot.green  { background: #4CAF50; }
+        .dot.orange { background: orange; animation: blink .8s infinite; }
+        .dot.red    { background: #f44336; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+        /* ── Controls ── */
+        .controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 8px; }
+        .controls input {
+            padding: 8px 10px; font-size: 14px; border-radius: 5px;
+            border: 1px solid #ccc; width: 210px;
+        }
+        button {
+            padding: 9px 14px; font-size: 14px; font-weight: bold;
+            background: #1565C0; color: white; border: none;
+            cursor: pointer; border-radius: 5px;
+        }
+        button:hover { filter: brightness(1.15); }
+        .g { background: #2e7d32; }
+        .p { background: #6a1b9a; }
+        .o { background: #e65100; }
+
+        #map { width: 100%; height: 490px; border-radius: 10px; }
+
+        /* ── Address search popup ── */
+        #addr-search-box {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        #addr-search-box.show { display: flex; }
+        #addr-inner {
+            background: white; border-radius: 12px;
+            padding: 20px; width: 90%; max-width: 480px;
+        }
+        #addr-inner h3 { margin-bottom: 12px; }
+        #addr-inner input {
+            width: 100%; padding: 10px; font-size: 15px;
+            border: 2px solid #1565C0; border-radius: 6px; outline: none;
+        }
+        #addr-suggestions {
+            list-style: none; border: 1px solid #ddd;
+            border-radius: 6px; max-height: 200px; overflow-y: auto;
+            margin-top: 6px; display: none;
+        }
+        #addr-suggestions li {
+            padding: 10px 12px; cursor: pointer; font-size: 13px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        #addr-suggestions li:hover { background: #e3f2fd; }
+        .addr-btns { display: flex; gap: 8px; margin-top: 10px; }
+        .addr-btns button { flex: 1; }
+
+        /* ── Order section ── */
+        .order-section {
+            margin-top: 16px; background: white;
+            padding: 16px; border-radius: 10px; text-align: center;
+        }
+        .order-section h2 { margin-bottom: 10px; }
+        .order-section label { font-weight: bold; display: block; margin-top: 10px; }
+        .order-section input,
+        .order-section select {
+            padding: 8px 10px; margin: 4px auto; font-size: 14px;
+            border-radius: 5px; border: 1px solid #ccc;
+            width: 280px; display: block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- GPS Loading Overlay (like Google Maps) -->
+<div id="gps-overlay">
+    <div class="gps-icon">📍</div>
+    <div class="pulse-ring"></div>
+    <div id="overlay-status">Finding your location...</div>
+    <div id="overlay-sub">Allow location access when your browser asks</div>
+    <div id="overlay-err"></div>
+    <button id="btn-manual" onclick="openAddrSearch()">📝 Enter location manually</button>
+</div>
+
+<nav class="navbar">
+    <span>⛽ Smart Fuel</span>
+    <span class="addr" id="nav-addr">Locating...</span>
+</nav>
+
+<section class="container">
+
+    <div id="status-bar">
+        <div class="dot orange" id="status-dot"></div>
+        <span id="status-text">Locating...</span>
+        <span id="status-acc"></span>
+        <button class="o" onclick="retryLocation()" style="padding:4px 10px;font-size:12px;">🔄 Retry</button>
+        <button onclick="openAddrSearch()" style="padding:4px 10px;font-size:12px;background:#555;">📝 Set Manually</button>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="search-input" placeholder="Search petrol pumps near area...">
+        <button onclick="searchArea()">🔍 Search</button>
+        <button onclick="goToMe()">📍 My Location</button>
+        <button class="p" onclick="toggleSat()">🛰 Satellite</button>
+    </div>
+
+    <div id="map"></div>
+
+</section>
+
+<!-- Manual address search popup -->
+<div id="addr-search-box">
+    <div id="addr-inner">
+        <h3>📍 Search your village / area / landmark</h3>
+        <input type="text" id="addr-input"
+            placeholder="e.g. Patancheru Village, Telangana"
+            oninput="onAddrInput()" onkeydown="if(event.key==='Enter') addrSearch()">
+        <ul id="addr-suggestions"></ul>
+        <div class="addr-btns">
+            <button class="g" onclick="addrSearch()">✅ Set This Location</button>
+            <button style="background:#888;" onclick="closeAddrSearch()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<section class="order-section">
+    <h2>🛢 Order Fuel</h2>
+    <label>Fuel Type:</label>
+    <select id="fuel-type">
+        <option value="petrol">Petrol</option>
+        <option value="diesel">Diesel</option>
+    </select>
+    <label>Quantity (Litres):</label>
+    <input type="number" id="quantity" min="1" placeholder="e.g. 10">
+    <label>Delivery Address:</label>
+    <input type="text" id="del-address" placeholder="Auto-filled from your location">
+    <button class="g" onclick="placeOrder()"
+        style="margin-top:14px;padding:11px 28px;font-size:15px;display:inline-block;width:auto;">
+        Place Order
+    </button>
+</section>
+
+<script>
+// ─────────────────────────────────────────
+// Map Init
+// ─────────────────────────────────────────
+const map = L.map("map").setView([17.3850, 78.4867], 5);
+
+const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors", maxZoom: 19
+}).addTo(map);
+
+const satLayer = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "Tiles &copy; Esri", maxZoom: 19 }
+);
+
+let isSat = false;
+let userLocation = null;
+let userMarker = null;
+let accuracyCircle = null;
+let routingControl = null;
+let petrolMarkers = [];
+let watchId = null;
+let bestAccuracy = Infinity;
+
+// ─────────────────────────────────────────
+// LOCATION — exactly like Google Maps
+// Uses watchPosition so it keeps refining
+// ─────────────────────────────────────────
+function startLocation() {
+    if (!navigator.geolocation) {
+        showOverlayError("Your browser doesn't support location. Please use Chrome or Firefox.");
+        return;
+    }
+
+    overlayStatus("Waiting for location permission...", "Tap 'Allow' when your browser asks");
+
+    watchId = navigator.geolocation.watchPosition(
+        onPosition,
+        onPositionError,
+        {
+            enableHighAccuracy: true,  // uses device GPS chip
+            maximumAge: 0,             // no cached positions
+            timeout: 20000
+        }
+    );
+}
+
+function onPosition(pos) {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const acc = Math.round(pos.coords.accuracy); // metres
+
+    // Keep refining — only update if better accuracy
+    if (acc < bestAccuracy) {
+        bestAccuracy = acc;
+
+        // Hide overlay once we have any fix
+        hideOverlay();
+
+        // Status bar
+        if (acc <= 30) {
+            setStatus("green", `✅ Exact location found — ±${acc}m`, `±${acc}m`);
+            // Stop watching — we have a great fix
+            if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+        } else if (acc <= 150) {
+            setStatus("green", `📍 Good location — ±${acc}m (still refining...)`, `±${acc}m`);
+        } else {
+            setStatus("orange", `📡 Approximate — ±${acc}m (move to open sky for better signal)`, `±${acc}m`);
+        }
+
+        placeUserPin(lat, lng, acc);
+        reverseGeocode(lat, lng);
+    }
+}
+
+function onPositionError(err) {
+    let msg = "", sub = "";
+
+    if (err.code === 1) {
+        // Permission denied
+        msg = "Location access denied";
+        sub = "Please allow location in your browser settings, then tap Retry";
+    } else if (err.code === 2) {
+        msg = "Location unavailable";
+        sub = "Move to open sky or near a window and tap Retry";
+    } else {
+        msg = "Location timed out";
+        sub = "Poor signal — tap Retry or enter your location manually";
+    }
+
+    showOverlayError(msg);
+    document.getElementById("overlay-sub").textContent = sub;
+    document.getElementById("btn-manual").style.display = "block";
+    setStatus("red", `❌ ${msg}`, "");
+}
+
+function retryLocation() {
+    bestAccuracy = Infinity;
+    if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    document.getElementById("gps-overlay").style.display = "flex";
+    startLocation();
+}
+
+// ─────────────────────────────────────────
+// Place pin on map
+// ─────────────────────────────────────────
+function placeUserPin(lat, lng, acc) {
+    userLocation = [lat, lng];
+    const zoom = acc <= 50 ? 17 : acc <= 200 ? 15 : 13;
+    map.setView(userLocation, zoom);
+
+    // Blue accuracy circle
+    if (accuracyCircle) map.removeLayer(accuracyCircle);
+    accuracyCircle = L.circle(userLocation, {
+        radius: acc, color: "#1976D2",
+        fillColor: "#1976D2", fillOpacity: 0.15, weight: 2
+    }).addTo(map);
+
+    // Red marker (draggable to fine-tune)
+    if (userMarker) {
+        userMarker.setLatLng(userLocation);
+    } else {
+        userMarker = L.marker(userLocation, {
+            draggable: true,
+            icon: L.icon({
+                iconUrl: "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+                iconSize: [40, 40], iconAnchor: [20, 40]
+            }),
+            zIndexOffset: 1000
+        }).addTo(map).bindPopup("📍 You are here").openPopup();
+
+        userMarker.on("dragend", function(e) {
+            const p = e.target.getLatLng();
+            userLocation = [p.lat, p.lng];
+            if (accuracyCircle) map.removeLayer(accuracyCircle);
+            setStatus("green", "📌 Location adjusted manually", "Manual");
+            reverseGeocode(p.lat, p.lng);
+            refreshPumps(userLocation);
+        });
+    }
+
+    refreshPumps(userLocation);
+}
+
+// ─────────────────────────────────────────
+// Reverse geocode → get readable address
+// ─────────────────────────────────────────
+function reverseGeocode(lat, lng) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+        .then(r => r.json())
+        .then(d => {
+            const addr = d.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+            document.getElementById("nav-addr").textContent =
+                addr.length > 60 ? addr.substring(0, 60) + "..." : addr;
+            document.getElementById("del-address").value = addr;
+        }).catch(() => {});
+}
+
+// ─────────────────────────────────────────
+// Overlay helpers
+// ─────────────────────────────────────────
+function hideOverlay() {
+    document.getElementById("gps-overlay").style.display = "none";
+}
+function overlayStatus(title, sub) {
+    document.getElementById("overlay-status").textContent = title;
+    document.getElementById("overlay-sub").textContent = sub;
+}
+function showOverlayError(msg) {
+    const el = document.getElementById("overlay-err");
+    el.textContent = "⚠️ " + msg;
+    el.style.display = "block";
+    document.getElementById("btn-manual").style.display = "block";
+    document.getElementById("overlay-status").textContent = "Could not find your location";
+}
+
+// ─────────────────────────────────────────
+// Status bar
+// ─────────────────────────────────────────
+function setStatus(color, text, acc) {
+    document.getElementById("status-dot").className = "dot " + color;
+    document.getElementById("status-text").textContent = text;
+    document.getElementById("status-acc").textContent = acc;
+}
+
+// ─────────────────────────────────────────
+// Manual address search (popup)
+// ─────────────────────────────────────────
+let addrTimer = null, addrResults = [];
+
+function openAddrSearch() {
+    closeAddrSearch(); // reset
+    document.getElementById("addr-search-box").classList.add("show");
+    document.getElementById("addr-input").focus();
+    hideOverlay(); // hide loading overlay if open
+}
+function closeAddrSearch() {
+    document.getElementById("addr-search-box").classList.remove("show");
+    document.getElementById("addr-suggestions").style.display = "none";
+    document.getElementById("addr-input").value = "";
+    addrResults = [];
+}
+function onAddrInput() {
+    clearTimeout(addrTimer);
+    const q = document.getElementById("addr-input").value.trim();
+    if (q.length < 3) { document.getElementById("addr-suggestions").style.display = "none"; return; }
+    addrTimer = setTimeout(() => {
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6`)
+            .then(r => r.json())
+            .then(data => {
+                addrResults = data;
+                const ul = document.getElementById("addr-suggestions");
+                ul.innerHTML = "";
+                if (!data.length) { ul.style.display = "none"; return; }
+                data.forEach((item, i) => {
+                    const li = document.createElement("li");
+                    li.textContent = item.display_name;
+                    li.onclick = () => {
+                        placeUserPin(parseFloat(item.lat), parseFloat(item.lon), 50);
+                        reverseGeocode(item.lat, item.lon);
+                        setStatus("green", "📌 Location set manually", "Manual");
+                        closeAddrSearch();
+                    };
+                    ul.appendChild(li);
+                });
+                ul.style.display = "block";
+            });
+    }, 300);
+}
+function addrSearch() {
+    const q = document.getElementById("addr-input").value.trim();
+    if (!q) return;
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.length) {
+                placeUserPin(parseFloat(data[0].lat), parseFloat(data[0].lon), 50);
+                reverseGeocode(data[0].lat, data[0].lon);
+                setStatus("green", "📌 Location set manually", "Manual");
+                closeAddrSearch();
+            } else alert("Place not found. Try adding your district or state.\nExample: 'Chevella Village, Telangana'");
+        });
+}
+
+// ─────────────────────────────────────────
+// Petrol pumps
+// ─────────────────────────────────────────
+function refreshPumps(loc) {
+    petrolMarkers.forEach(m => map.removeLayer(m));
+    petrolMarkers = [];
+    const q = `[out:json];node["amenity"="fuel"](around:10000,${loc[0]},${loc[1]});out;`;
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            data.elements.forEach(s => {
+                const name = (s.tags.name || "Petrol Pump").replace(/'/g, "\\'");
+                const m = L.marker([s.lat, s.lon]).addTo(map).bindPopup(
+                    `<strong>${name}</strong><br>
+                    <button onclick="navigateTo(${s.lat},${s.lon})">🗺 Navigate</button>
+                    <button onclick="orderFrom('${name}')">🛢 Order</button>`
+                );
+                petrolMarkers.push(m);
+            });
+        });
+}
+
+// ─────────────────────────────────────────
+// Map controls
+// ─────────────────────────────────────────
+function searchArea() {
+    const q = document.getElementById("search-input").value.trim();
+    if (!q) return;
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.length) {
+                map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 14);
+                refreshPumps([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+            } else alert("Area not found.");
+        });
+}
+function goToMe() {
+    if (userLocation) map.setView(userLocation, 17);
+    else alert("Location not set yet.");
+}
+function toggleSat() {
+    if (isSat) { map.removeLayer(satLayer); osmLayer.addTo(map); }
+    else { map.removeLayer(osmLayer); satLayer.addTo(map); }
+    isSat = !isSat;
+}
+function navigateTo(lat, lon) {
+    if (!userLocation) { alert("Set your location first!"); return; }
+    if (routingControl) map.removeControl(routingControl);
+    routingControl = L.Routing.control({
+        waypoints: [L.latLng(userLocation[0], userLocation[1]), L.latLng(lat, lon)],
+        routeWhileDragging: true, createMarker: () => null
+    }).addTo(map);
+}
+function orderFrom(name) { alert(`Order placed from: ${name}`); }
+function placeOrder() {
+    const fuel = document.getElementById("fuel-type").value;
+    const qty  = document.getElementById("quantity").value;
+    const addr = document.getElementById("del-address").value;
+    if (!qty || !addr) { alert("Please fill all details!"); return; }
+    alert(`✅ Order placed!\nFuel: ${fuel}\nQuantity: ${qty} litres\nDelivery: ${addr}`);
+}
+
+// Click map to set location
+map.on("click", function(e) {
+    placeUserPin(e.latlng.lat, e.latlng.lng, 30);
+    reverseGeocode(e.latlng.lat, e.latlng.lng);
+    setStatus("green", "📌 Location set by map click", "Manual");
+});
+
+// ─────────────────────────────────────────
+// START
+// ─────────────────────────────────────────
+startLocation();
+</script>
+</body>
+</html>

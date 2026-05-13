@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Fuel System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-routing-machine/3.2.12/leaflet-routing-machine.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #002f00, #00cc44, #009933);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            color: white;
+            text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        
+        .splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #004d00, #00cc44);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            font-size: 2rem;
+            z-index: 1000;
+            animation: fadeOut 3s ease-in-out forwards;
+            animation-delay: 2s;
+        }
+        
+        .splash-screen h1 {
+            font-size: 3.5rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #ffffff, #aaffaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 2s infinite alternate;
+        }
+        
+        @keyframes glow {
+            0% { text-shadow: 0 0 10px #aaffaa; }
+            100% { text-shadow: 0 0 30px #aaffaa; }
+        }
+        
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        
+        .splash-screen p {
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: linear-gradient(90deg, #ffcc00, #ff6600);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: wave 2s infinite;
+        }
+
+        @keyframes wave {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .welcome-container {
+            text-align: center;
+            opacity: 0;
+            animation: fadeIn 1.5s ease-in-out 3s forwards;
+        }
+        
+        .navbar {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 4px solid #ffcc00;
+            box-shadow: 0px 4px 15px rgba(255, 204, 0, 0.8);
+            animation: slideInDown 1s ease-in-out;
+        }
+        
+        @keyframes slideInDown {
+            0% { transform: translateY(-100%); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        .welcome-box h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #ffcc00, #ffffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse 2s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+        
+        .tagline {
+            font-size: 2rem;
+            margin-top: 15px;
+            font-weight: 500;
+            color: #ffcc00;
+            animation: fadeIn 2s ease-in-out 3s forwards;
+        }
+        
+        .button {
+            display: inline-block;
+            margin-top: 25px;
+            padding: 15px 35px;
+            background: linear-gradient(90deg, #ffcc00, #ff4400);
+            color: black;
+            text-decoration: none;
+            font-weight: 700;
+            border-radius: 50px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            font-size: 1.5rem;
+            border: 3px solid white;
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .button:hover {
+            transform: scale(1.2);
+            box-shadow: 0px 15px 30px rgba(255, 102, 0, 0.8);
+            background: white;
+            color: #ff4400;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="splash-screen">
+        <h1>Smart Fuel System</h1>
+        <p>⛽ Powering Your Journey...</p>
+    </div>
+    
+    <nav class="navbar">
+        <div class="logo"> Smart Fuel</div>
+    </nav>
+    <div class="welcome-container">
+        <div class="welcome-box">
+            <h1>Welcome to <span> Smart Fuel System</span></h1>
+            <p class="tagline">Your Fuel, Your Way🝎⛽</p>
+            <a href="updated2.html" class="button">Get Started</a>
+        </div>
+    </div>
+</body>
+</html>
