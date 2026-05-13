@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        DOCKER_IMAGE = "sidduthatikanti93/resumatch"
+        DOCKER_IMAGE = "sidduthatikanti93/smartfuelsystem"
         DOCKER_TAG   = "latest"
         DOCKER_CREDS = "dockerhub-creds"
     }
@@ -42,8 +42,8 @@ pipeline {
             steps {
                 echo "Running container on port 8085..."
                 sh '''
-                    docker rm -f resumatch-container || true
-                    docker run -d -p 8085:80 --name resumatch-container ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker rm -f smartfuelsystem-container || true
+                    docker run -d -p 8085:80 --name smartfuelsystem-container ${DOCKER_IMAGE}:${DOCKER_TAG}
                 '''
             }
         }
